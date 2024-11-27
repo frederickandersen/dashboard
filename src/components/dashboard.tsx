@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchTimeTracked, fetchClickUpLists, type ClickUpList } from '@/services/clickup-service'
 
 interface TimeCard {
@@ -29,10 +29,16 @@ export function Dashboard() {
 
   const [selectedLists, setSelectedLists] = useState<Record<string, string>>({})
 
-  const { data: lists = [] } = useQuery({
+  const { data: lists = [], error: listsError } = useQuery({
     queryKey: ['lists'],
     queryFn: fetchClickUpLists
   })
+
+  if (listsError) return (
+    <div className="min-h-screen p-8">
+      <p className="text-lg text-red-500">Failed to load lists</p>
+    </div>
+  )
 
   // Create a function to handle list selection for each card
   const handleListSelect = (cardId: string, listId: string) => {
@@ -67,7 +73,7 @@ interface TimeTrackingCardProps {
 }
 
 function TimeTrackingCard({ title, lists, selectedList, onListSelect }: TimeTrackingCardProps) {
-  const { data: timeData, isLoading } = useQuery({
+  const { data: timeData, isLoading, error } = useQuery({
     queryKey: ['timeTracked', selectedList],
     queryFn: () => selectedList ? fetchTimeTracked(selectedList) : null,
     enabled: !!selectedList
@@ -99,13 +105,18 @@ function TimeTrackingCard({ title, lists, selectedList, onListSelect }: TimeTrac
         </Select>
       </CardHeader>
       <CardContent>
+        {error && (
+          <p className="text-lg text-red-500 text-center py-8">
+            Failed to load time data
+          </p>
+        )}
         {isLoading && (
           <p className="text-lg text-muted-foreground text-center py-8">Loading...</p>
         )}
         {timeData && (
-        <div className="text-6xl font-bold text-center py-4">
+          <div className="text-6xl font-bold text-center py-4">
             {timeData.formattedTime}
-        </div>
+          </div>
         )}
         {!selectedList && (
           <p className="text-lg text-muted-foreground text-center py-8">

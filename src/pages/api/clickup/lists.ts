@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
+import type { ClickUpTeam, ClickUpList } from '@/types/clickup'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = process.env.CLICKUP_API_TOKEN
@@ -16,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const apiToken = `pk_${token}`
     console.log('Using token (first 13 chars):', apiToken.substring(0, 13))
 
-    const teamsResponse = await axios.get('https://api.clickup.com/api/v2/team', {
+    const teamsResponse = await axios.get<{ teams: ClickUpTeam[] }>('https://api.clickup.com/api/v2/team', {
       headers: {
         'Authorization': apiToken
       },
@@ -24,29 +25,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const teamId = teamsResponse.data.teams[0].id
 
-    const listsResponse = await axios.get(`https://api.clickup.com/api/v2/team/${teamId}/list`, {
+    const listsResponse = await axios.get<{ lists: ClickUpList[] }>(`https://api.clickup.com/api/v2/team/${teamId}/list`, {
       headers: {
         'Authorization': apiToken
       },
     })
 
-    const formattedLists = listsResponse.data.lists.map((list: any) => ({
+    const formattedLists = listsResponse.data.lists.map((list) => ({
       id: list.id,
       name: list.name,
     }))
 
     res.status(200).json(formattedLists)
-  } catch (error: any) {
-    console.error('Full error details:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      headers: error.response?.config?.headers
-    })
-    
-    res.status(500).json({ 
-      error: 'Failed to fetch lists', 
-      details: error.response?.data || error.message 
-    })
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      console.error('Full error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.config?.headers
+      })
+      
+      res.status(500).json({ 
+        error: 'Failed to fetch lists', 
+        details: error.response?.data || error.message 
+      })
+    } else {
+      console.error('Unexpected error:', error)
+      res.status(500).json({ 
+        error: 'Failed to fetch lists',
+        details: 'An unexpected error occurred'
+      })
+    }
   }
 }

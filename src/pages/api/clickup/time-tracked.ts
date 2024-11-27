@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import axios from 'axios'
+import axios, { AxiosError } from 'axios'
+import type { ClickUpTimeEntry, ClickUpTimeEntriesResponse } from '@/types/clickup'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -21,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const days = parseInt(timeframe as string)
     const startDate = new Date(now - days * 24 * 60 * 60 * 1000).getTime()
 
-    const response = await axios.get(`https://api.clickup.com/api/v2/team/${process.env.CLICKUP_WORKSPACE_ID}/time_entries`, {
+    const response = await axios.get<ClickUpTimeEntriesResponse>(`https://api.clickup.com/api/v2/team/${process.env.CLICKUP_WORKSPACE_ID}/time_entries`, {
       headers: {
         'Authorization': apiToken
       },
@@ -38,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Raw time entries:', response.data.data.slice(0, 2)) // Log first two entries
     
     // Group time entries by day
-    const timeByDay = response.data.data.reduce((acc: Record<string, number>, entry: any) => {
+    const timeByDay = response.data.data.reduce((acc: Record<string, number>, entry: ClickUpTimeEntry) => {
       const date = new Date(entry.start).toLocaleDateString()
       const hours = (entry.duration || 0) / (1000 * 60 * 60)
       console.log(`Entry duration: ${entry.duration}ms = ${hours}h`)
@@ -61,11 +62,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timeByDay
       }
     })
-  } catch (error: any) {
-    console.error('Error fetching time tracked:', error.response?.data || error)
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<unknown>
+    console.error('Error fetching time tracked:', axiosError.response?.data || axiosError.message)
     res.status(500).json({ 
       error: 'Failed to fetch time tracked',
-      details: error.response?.data || error.message
+      details: axiosError.response?.data || axiosError.message
     })
   }
 }
